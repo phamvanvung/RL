@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <script src="math.js"></script>
+    <script src="charts.min.js"></script>
+    <script src="d3-random.v2.min.js"></script>
+    <script src="utils.js"></script>
+    <script src="generatedata.js"></script>
+    <script src="simulation.js"></script>
+    <title>RL</title>
+</head>
+<body>
+<div style="width: 400px; height: 400px;" id="theta"></div>
+<div style="width: 400px; height: 400px;" id="regrets"></div>
+<script>
+    let X = generateData(N_TRIALS, N_ARMS, N_FEATURES);
+    let theta = generateTheta(N_ARMS, N_FEATURES, BEST_ARMS, 1.0);
+    let heatMapData = {
+        x: Array.from(new Array(N_ARMS), (_, i) => i),
+        y: Array.from(new Array(N_FEATURES), (_, i) => i),
+        z: theta
+    };
+    let heatMapSettings = {
+        noSvg: false,
+        showAxes: true,
+        paddingLeft: 40,
+        paddingRight: 50,
+        paddingTop: 50,
+        paddingBottom: 50,
+        showColorBar: true,
+        xAxisLabel: {text: 'arms'},
+        yAxisLabel: {text: 'features'}
+    };
+    let hm = new HeatMap(document.getElementById("theta"), heatMapData, heatMapSettings);
+    hm.plot();
+    let oracles = X.map(trial => {
+        return math.max(trial.map((arm, i) => {
+            return math.dot(arm, theta[i]);
+        }));
+    });
+    let payoffsRandom = X.map(trial => {
+        let randomArm = d3.randomInt(0, N_ARMS)();
+        return math.dot(trial[randomArm], theta[randomArm]);
+    });
+    let regretsRandom = makeRegret(payoffsRandom, oracles);
+    let regrets = {};
+    regrets['random'] = regretsRandom;
+
+    let alphas = [0, 1.0, 2.5, 5.0, 10.0];
+    alphas.forEach(alpha=>{
+        let payoffsAlpha = linUCB(alpha, X, generateReward, theta);
+        regrets['alpha='+alpha] = makeRegret(payoffsAlpha, oracles);
+    });
+
+    let trials = Array.from(new Array(N_TRIALS), (_, i) => i);
+
+    let lineChartData = Object.keys(regrets).map(k=>{
+        return {
+            x: trials,
+            y: regrets[k],
+            series: k
+        }
+    });
+
+    let lc = new LineChart(document.getElementById('regrets'),
+        lineChartData,
+        {
+            noSvg: false,
+            showAxes: true,
+            paddingLeft: 40,
+            paddingRight: 30,
+            paddingTop: 50,
+            paddingBottom: 25,
+            legend: {
+                x: 40 + 20,
+                y: 50 + 20
+            }
+        });
+    lc.plot();
+
+</script>
+</body>
+</html>
